@@ -1,0 +1,45 @@
+{
+  "name": "llm-firewall",
+  "version": "0.1.0",
+  "description": "Detect and block malicious or dangerous AI prompts — prompt injection, PII, and harmful content detection",
+  "type": "module",
+  "main": "./dist/lib.cjs",
+  "module": "./dist/lib.js",
+  "types": "./dist/lib.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/lib.js",
+      "require": "./dist/lib.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maatt/llm-firewall.git"
+  },
+  "homepage": "https://github.com/maatt/llm-firewall#readme",
+  "bugs": {
+    "url": "https://github.com/maatt/llm-firewall/issues"
+  },
+  "keywords": ["ai", "firewall", "prompt", "security", "llm", "prompt-injection", "jailbreak"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
