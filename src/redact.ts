@@ -44,10 +44,10 @@ const REDACT_PATTERNS: RedactPattern[] = [
   { name: "api-key", pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*['"]?[A-Za-z0-9_\-]{16,}/gi },
   { name: "secret-key", pattern: /(?:secret[_-]?key|client[_-]?secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-]{16,}/gi },
   { name: "password", pattern: /(?:password|passwd|pwd)\s*[:=]\s*['"]?.{6,}/gi },
+  { name: "jwt", pattern: /eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g },
   { name: "bearer-token", pattern: /bearer(?:\s+token)?\s*[:=]?\s+[A-Za-z0-9\-._~+/]{8,}=*/gi },
   { name: "private-key", pattern: /-----BEGIN\s+(?:RSA\s+|EC\s+|DSA\s+|OPENSSH\s+)?PRIVATE\s+KEY-----.+?-----END[^-]+PRIVATE\s+KEY-----/gs },
   { name: "connection-string", pattern: /(?:mongodb(?:\+srv)?|postgresql|mysql|redis|amqp|rabbitmq):\/\/[^:]+:[^@]+@[^\s"']+/gi },
-  { name: "jwt", pattern: /eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g },
   { name: "basic-auth", pattern: /Authorization:\s*Basic\s+[A-Za-z0-9+/=]{8,}/gi },
 
   // Financial
