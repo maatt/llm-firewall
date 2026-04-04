@@ -19,7 +19,8 @@ export type HarmCategory =
   | "terrorism"
   | "personal-targeting"
   | "extremism"
-  | "financial-crime";
+  | "financial-crime"
+  | "sexual";
 
 export interface DetectionResult {
   detector: DetectorName;

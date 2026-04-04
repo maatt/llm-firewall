@@ -27,6 +27,7 @@ export { VertexAIJudge } from "./judge/providers/vertex-ai.js";
 export { LangChainJudge } from "./judge/providers/langchain.js";
 export { LlamaIndexJudge } from "./judge/providers/llamaindex.js";
 export { HuggingFaceJudge } from "./judge/providers/huggingface.js";
+export { GeminiJudge } from "./judge/providers/gemini.js";
 export { JUDGE_SYSTEM_PROMPT } from "./judge/prompt.js";
 
 // Types

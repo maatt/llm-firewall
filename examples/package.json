@@ -1,0 +1,22 @@
+{
+  "name": "llm-firewall-examples",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "basic": "tsx basic.ts",
+    "redact": "tsx redact.ts",
+    "policy": "tsx policy.ts",
+    "judge": "tsx judge.ts",
+    "try": "tsx try.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.21.0",
+    "llm-firewall": "file:..",
+    "openai": "^4.97.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}

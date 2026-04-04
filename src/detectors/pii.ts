@@ -25,7 +25,7 @@ const PII_PATTERNS: Array<{ name: string; pattern: RegExp; severity: "low" | "me
   { name: "basic-auth", pattern: /Authorization:\s*Basic\s+[A-Za-z0-9+/=]{8,}/i, severity: "critical" },
 
   // ─── FINANCIAL ───────────────────────────────────────────────────────────────
-  { name: "credit-card", pattern: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12}|3(?:0[0-5]|[68][0-9])[0-9]{11})\b/, severity: "high" },
+  { name: "credit-card", pattern: /\b(?:4[0-9]{3}(?:[ \-]?[0-9]{4}){3}|5[1-5][0-9]{2}(?:[ \-]?[0-9]{4}){3}|3[47][0-9]{2}[ \-]?[0-9]{6}[ \-]?[0-9]{5}|6(?:011|5[0-9]{2})(?:[ \-]?[0-9]{4}){3}|3(?:0[0-5]|[68][0-9])[0-9]{2}[ \-]?[0-9]{6}[ \-]?[0-9]{4})\b/, severity: "high" },
   { name: "iban", pattern: /\b[A-Z]{2}\d{2}[A-Z0-9]{1,30}\b/, severity: "high" },
   { name: "ssn", pattern: /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/, severity: "high" },
   { name: "sort-code", pattern: /\b\d{2}-\d{2}-\d{2}\b/, severity: "medium" },

@@ -18,12 +18,16 @@ await firewall.guardAsync(userPrompt); // throws if blocked
 npm install llm-firewall
 ```
 
+Requires Node.js **>=20**.
+
+---
+
 ## How it works
 
 Two layers of protection:
 
 1. **Rule-based detectors** — fast, synchronous, zero dependencies. Pattern-match against known injection techniques, credential formats, and harmful content categories.
-2. **LLM-as-judge** — optional async layer that sends the prompt to a second LLM for semantic evaluation. Catches threats that pattern matching misses. The judge is skipped entirely if rules already block the prompt.
+2. **LLM-as-judge** — optional async layer that sends the prompt to a second LLM for semantic evaluation. Catches threats that pattern matching misses. Skipped entirely if rules already block the prompt.
 
 ---
 
@@ -62,8 +66,8 @@ import { Firewall, FirewallBlockedError } from "llm-firewall";
 const firewall = new Firewall();
 
 try {
-  firewall.guard(userPrompt);          // sync
-  await firewall.guardAsync(prompt);   // async (rules + judge)
+  firewall.guard(userPrompt);           // sync
+  await firewall.guardAsync(prompt);    // async (rules + judge)
 } catch (e) {
   if (e instanceof FirewallBlockedError) {
     console.log(e.result.detections);
@@ -76,10 +80,6 @@ try {
 ### Express / Fastify middleware
 
 ```ts
-import { Firewall, FirewallBlockedError } from "llm-firewall";
-
-const firewall = new Firewall();
-
 app.post("/chat", async (req, res) => {
   try {
     await firewall.guardAsync(req.body.message);
@@ -101,156 +101,72 @@ Three built-in detectors, all enabled by default.
 
 | Detector | What it catches |
 |----------|-----------------|
-| `injection` | Jailbreaks, DAN/god mode, system prompt extraction, instruction overrides, token injection, zero-width char obfuscation, indirect injection |
-| `pii` | API keys (AWS, GCP, GitHub, Slack, Stripe, Twilio…), passwords, JWTs, connection strings, credit cards, SSNs, IBANs, passports, NHS/NI numbers, crypto private keys |
-| `harmful` | Weapons, explosives, chemical/bio/radiological, drugs, malware, phishing, fraud, human trafficking, CSAM, self-harm, terrorism, stalking, infrastructure attacks |
-
-### Configuring detectors
+| `injection` | Jailbreaks, DAN/god mode, named personas, system prompt extraction, instruction overrides, encoding bypass |
+| `pii` | API keys (AWS, GCP, GitHub, Slack…), passwords, bearer tokens, JWTs, credit cards, SSNs, passports |
+| `harmful` | Weapons, explosives, CBRN, drugs, malware, fraud, CSAM, self-harm, terrorism, sexual solicitation |
 
 ```ts
 const firewall = new Firewall()
-  .use("injection", "harmful")        // run only these detectors
-  .blockOn("high", "critical");       // block only on these severities
+  .use("injection", "harmful")      // run only these detectors
+  .blockOn("high", "critical");     // block only on these severities
 ```
 
-### Using detectors directly
-
-```ts
-import { detectInjection, detectPII, detectHarmful } from "llm-firewall";
-
-const result = detectInjection(prompt);
-// {
-//   detector: "injection",
-//   triggered: true,
-//   severity: "critical",
-//   reason: "Prompt injection pattern detected",
-//   matches: ["Ignore all previous instructions"]
-// }
-```
+Full detector docs, harm categories, and severity levels: **[Wiki → Detectors](https://github.com/maatt/llm-firewall/wiki/Detectors)**
 
 ---
 
 ## LLM-as-judge providers
 
-Seven built-in providers. All use duck-typed client interfaces — no hard peer dependencies on any SDK.
+Eight built-in providers. All use duck-typed client interfaces — no hard peer dependencies.
 
-### Anthropic
+| Provider | Class | Default model |
+|----------|-------|---------------|
+| Anthropic | `AnthropicJudge` | `claude-haiku-4-5-20251001` |
+| OpenAI | `OpenAIJudge` | `gpt-4o-mini` |
+| Google Gemini | `GeminiJudge` | — (set at model init) |
+| Azure OpenAI | `AzureOpenAIJudge` | — (set via deployment) |
+| GCP Vertex AI | `VertexAIJudge` | — (set at model init) |
+| LangChain | `LangChainJudge` | any `BaseChatModel` |
+| LlamaIndex | `LlamaIndexJudge` | any `LLM` |
+| HuggingFace | `HuggingFaceJudge` | configurable |
 
-```ts
-import Anthropic from "@anthropic-ai/sdk";
-import { AnthropicJudge } from "llm-firewall";
+Full setup for all providers: **[Wiki → Judge Providers](https://github.com/maatt/llm-firewall/wiki/Judge-Providers)**
 
-const judge = new AnthropicJudge(new Anthropic(), {
-  model: "claude-haiku-4-5-20251001", // default
-});
-```
+---
 
-### OpenAI
+## Redaction
 
-```ts
-import OpenAI from "openai";
-import { OpenAIJudge } from "llm-firewall";
-
-const judge = new OpenAIJudge(new OpenAI(), {
-  model: "gpt-4o-mini", // default
-});
-```
-
-### Azure OpenAI
+Strip PII from prompts instead of blocking them:
 
 ```ts
-import { AzureOpenAI } from "openai";
-import { AzureOpenAIJudge } from "llm-firewall";
+import { redact } from "llm-firewall";
 
-const judge = new AzureOpenAIJudge(
-  new AzureOpenAI({
-    apiKey: process.env.AZURE_OPENAI_API_KEY,
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-    apiVersion: "2024-02-01",
-  }),
-  { deployment: "gpt-4o-mini" }
-);
+const { redacted, redactions } = redact("My email is john@acme.com and SSN is 123-45-6789");
+// redacted   → "My email is [REDACTED:email] and SSN is [REDACTED:ssn]"
+// redactions → [{ type: "email", … }, { type: "ssn", … }]
 ```
 
-### GCP Vertex AI
+Full redaction docs: **[Wiki → Redaction](https://github.com/maatt/llm-firewall/wiki/Redaction)**
+
+---
+
+## Custom policy rules
 
 ```ts
-import { VertexAI } from "@google-cloud/vertexai";
-import { VertexAIJudge } from "llm-firewall";
-
-const model = new VertexAI({ project: "my-project", location: "us-central1" })
-  .getGenerativeModel({ model: "gemini-1.5-flash" });
-
-const judge = new VertexAIJudge(model);
+const firewall = new Firewall().withPolicy([
+  { name: "no-competitor", pattern: /rival-corp/i, severity: "medium", reason: "Competitor mention" },
+  { name: "no-internal-codename", pattern: "project-atlas", severity: "high" },
+]);
 ```
 
-### LangChain
-
-Works with any `BaseChatModel` — `ChatOpenAI`, `ChatAnthropic`, `ChatGoogleGenerativeAI`, `ChatMistralAI`, and more.
-
-```ts
-import { ChatOpenAI } from "@langchain/openai";
-import { LangChainJudge } from "llm-firewall";
-
-const judge = new LangChainJudge(
-  new ChatOpenAI({ model: "gpt-4o-mini", maxTokens: 256 })
-);
-```
-
-### LlamaIndex
-
-Works with any LlamaIndex `LLM` — `OpenAI`, `Anthropic`, `Groq`, `Mistral`, and more.
-
-```ts
-import { Anthropic } from "llamaindex";
-import { LlamaIndexJudge } from "llm-firewall";
-
-const judge = new LlamaIndexJudge(
-  new Anthropic({ model: "claude-haiku-4-5-20251001" })
-);
-```
-
-### HuggingFace
-
-Use any instruction-tuned model that supports the chat completion API.
-
-```ts
-import { HfInference } from "@huggingface/inference";
-import { HuggingFaceJudge } from "llm-firewall";
-
-const judge = new HuggingFaceJudge(new HfInference(process.env.HF_TOKEN), {
-  model: "mistralai/Mistral-7B-Instruct-v0.3",
-});
-```
-
-### Custom provider
-
-Implement the `JudgeProvider` interface to use any LLM:
-
-```ts
-import type { JudgeProvider, JudgeVerdict } from "llm-firewall";
-
-class MyCustomJudge implements JudgeProvider {
-  async evaluate(prompt: string): Promise<JudgeVerdict> {
-    // call your LLM here
-    return {
-      safe: true,
-      severity: "none",
-      categories: [],
-      reasoning: "looks fine",
-    };
-  }
-}
-```
+Full docs: **[Wiki → Custom Policy](https://github.com/maatt/llm-firewall/wiki/Custom-Policy)**
 
 ---
 
 ## Audit logging
 
-Every analysis result — allowed or blocked — can be sent to one or more audit loggers. Loggers never affect firewall behaviour: errors are silently swallowed.
-
 ```ts
-import { Firewall, ConsoleLogger, FileLogger, WebhookLogger } from "llm-firewall";
+import { ConsoleLogger, FileLogger, WebhookLogger } from "llm-firewall";
 
 const firewall = new Firewall()
   .withAuditLogger(new ConsoleLogger({ format: "pretty" }))
@@ -258,179 +174,54 @@ const firewall = new Firewall()
   .withAuditLogger(new WebhookLogger({ url: "https://my-siem.example.com/ingest" }));
 ```
 
-### ConsoleLogger
-
-```ts
-new ConsoleLogger({
-  format: "json",          // "json" (default) or "pretty"
-  stderrOnBlock: true,     // write blocked entries to stderr (default: true)
-});
-```
-
-### FileLogger
-
-Appends entries as JSONL (one JSON object per line). Compatible with Loki, Splunk, Datadog, and `jq`.
-
-```ts
-new FileLogger({
-  path: "./logs/firewall.jsonl",
-  omit: ["prompt"],   // optional — strip fields for privacy
-});
-```
-
-### WebhookLogger
-
-POSTs entries as JSON to any HTTP endpoint. Supports auth headers, retries, and timeout.
-
-```ts
-// Datadog
-new WebhookLogger({
-  url: "https://http-intake.logs.datadoghq.com/api/v2/logs",
-  headers: { "DD-API-KEY": process.env.DD_API_KEY! },
-});
-
-// Splunk HEC
-new WebhookLogger({
-  url: "https://splunk.example.com:8088/services/collector/event",
-  headers: { Authorization: `Splunk ${process.env.SPLUNK_HEC_TOKEN}` },
-});
-
-// Generic webhook
-new WebhookLogger({
-  url: "https://my-api.example.com/audit",
-  headers: { Authorization: `Bearer ${process.env.AUDIT_TOKEN}` },
-  retries: 2,        // default: 2 (exponential backoff)
-  timeoutMs: 5000,   // default: 5000
-  omit: ["prompt"],  // don't send raw prompts off-device
-});
-```
-
-### Custom logger
-
-```ts
-import type { AuditLogger, AuditEntry } from "llm-firewall";
-
-class MyLogger implements AuditLogger {
-  async log(entry: AuditEntry): Promise<void> {
-    await db.insert("audit_log", entry);
-  }
-}
-```
-
-### Metadata
-
-Pass per-call context and static labels to every log entry:
-
-```ts
-// Static metadata — merged into every entry from this instance
-const firewall = new Firewall()
-  .withAuditLogger(logger, { service: "chat-api", env: "production" });
-
-// Per-call metadata — merged at call time
-firewall.analyze(prompt, { userId: "u_123", sessionId: "s_456" });
-await firewall.guardAsync(prompt, { requestId: req.id });
-```
-
-### AuditEntry shape
-
-```ts
-interface AuditEntry {
-  timestamp: string;                // ISO 8601
-  allowed: boolean;
-  prompt: string;
-  detections: DetectionResult[];
-  durationMs: number;
-  metadata?: Record<string, unknown>;
-}
-```
-
----
-
-## Harm categories
-
-Returned in `detections[].categories` when the `harmful` detector or judge triggers.
-
-| Category | Examples |
-|----------|----------|
-| `explosives` | Bomb-making, IED assembly, explosive synthesis |
-| `firearms` | Auto conversions, ghost guns, Glock switches, trafficking |
-| `chemical-weapons` | Nerve agents, ricin, toxic gas dispersal |
-| `bioweapons` | Pathogen enhancement, gain-of-function, aerosolization |
-| `radiological` | Dirty bombs, uranium enrichment, nuclear devices |
-| `drugs` | Fentanyl synthesis, darknet sourcing, drink spiking |
-| `cyberattack` | Malware, phishing kits, DDoS tools, infrastructure attacks |
-| `fraud` | Scams, deepfakes, SIM swap, fake documents, money laundering |
-| `human-trafficking` | Smuggling, forced labor, exploitation |
-| `csam` | Sexual content involving minors, grooming |
-| `self-harm` | Suicide methods, self-injury, facilitating others |
-| `violence` | Murder planning, assault, honor killings |
-| `terrorism` | Attack planning, manifestos, mass casualty |
-| `extremism` | Radicalization, hate group recruitment |
-| `personal-targeting` | Stalking, doxxing, harassment campaigns, stalkerware |
-| `financial-crime` | Insider trading, market manipulation, money laundering |
-| `weapons` | Illegal weapons trafficking |
-
----
-
-## Severity levels
-
-| Level | Examples | Blocked by default? |
-|-------|----------|---------------------|
-| `low` | Email address, phone number, roleplay request | No |
-| `medium` | Persona override attempt, disinformation campaign | No |
-| `high` | System prompt extraction, self-harm methods, phishing | **Yes** |
-| `critical` | Jailbreak, API key, nerve agent synthesis, CSAM | **Yes** |
+Supports Datadog, Splunk HEC, and any HTTP endpoint. Full docs: **[Wiki → Audit Logging](https://github.com/maatt/llm-firewall/wiki/Audit-Logging)**
 
 ---
 
 ## API reference
 
-### `new Firewall()`
+Full TypeScript API: **[Wiki → API Reference](https://github.com/maatt/llm-firewall/wiki/API-Reference)**
+
+Quick summary:
 
 ```ts
-firewall.use(...detectors)          // select detectors: "injection" | "pii" | "harmful"
-firewall.blockOn(...severities)     // select block threshold: "low" | "medium" | "high" | "critical"
-firewall.withJudge(provider)        // attach LLM judge for async methods
+// Firewall builder
+firewall.use(...detectors)          // "injection" | "pii" | "harmful"
+firewall.blockOn(...severities)     // "low" | "medium" | "high" | "critical"
+firewall.withJudge(provider)
+firewall.withPolicy(rules)
+firewall.withAuditLogger(logger, meta?)
 
-firewall.analyze(prompt)            // → FirewallResult         (sync, rules only)
-firewall.analyzeAsync(prompt)       // → Promise<FirewallResult> (async, rules + judge)
-firewall.guard(prompt)              // → void | throws FirewallBlockedError
-firewall.guardAsync(prompt)         // → Promise<void> | throws FirewallBlockedError
+firewall.analyze(prompt, meta?)         // → FirewallResult
+firewall.analyzeAsync(prompt, meta?)    // → Promise<FirewallResult>
+firewall.guard(prompt, meta?)           // → void | throws FirewallBlockedError
+firewall.guardAsync(prompt, meta?)      // → Promise<void> | throws FirewallBlockedError
+
+// Functional API
+import { analyze, analyzeAsync, redact } from "llm-firewall";
+
+// Individual detectors
+import { detectInjection, detectPII, detectHarmful } from "llm-firewall";
 ```
 
-### `FirewallResult`
+---
 
-```ts
-interface FirewallResult {
-  allowed: boolean;
-  prompt: string;
-  detections: DetectionResult[];
-}
+## Examples
 
-interface DetectionResult {
-  detector: "injection" | "pii" | "harmful" | "judge";
-  triggered: boolean;
-  severity?: "low" | "medium" | "high" | "critical";
-  reason?: string;
-  matches?: string[];        // matched pattern strings or PII type names
-  categories?: HarmCategory[]; // populated for harmful detector and judge
-  judgeReasoning?: string;   // populated when detector is "judge"
-}
-```
+Working examples are in the [`examples/`](./examples) directory.
 
-### `analyze(prompt, config?)`
+| Script | What it shows |
+|--------|---------------|
+| `npm run basic` | `analyze()`, `Firewall` class, `guard()` + error handling |
+| `npm run redact` | Strip PII before it reaches the LLM |
+| `npm run policy` | Custom regex rules per your domain |
+| `npm run judge` | Live LLM judge — set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` |
+| `npm run try` | Interactive terminal demo — type any prompt |
 
-Functional alternative to the class API:
-
-```ts
-import { analyze, analyzeAsync } from "llm-firewall";
-
-const result = analyze(prompt, {
-  detectors: ["injection", "pii", "harmful"],
-  blockOnSeverity: ["high", "critical"],
-});
-
-const result = await analyzeAsync(prompt, judgeProvider, config);
+```bash
+cd examples
+npm install
+npm run try
 ```
 
 ---
@@ -438,16 +229,9 @@ const result = await analyzeAsync(prompt, judgeProvider, config);
 ## Development
 
 ```bash
-npm test           # run tests (80 tests, no network calls)
+npm test           # run tests
 npm run typecheck  # type check without building
 npm run build      # compile to dist/
 ```
 
----
-
-## Roadmap
-
-- [ ] Redaction mode — strip PII from prompts rather than blocking
-- [ ] Custom rule policies via config file
-- [ ] CommonJS build (dual ESM/CJS)
-- [ ] Rate limiting per identity
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to add detectors, judge providers, or loggers.

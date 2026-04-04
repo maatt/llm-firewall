@@ -32,8 +32,26 @@
   },
   "keywords": ["ai", "firewall", "prompt", "security", "llm", "prompt-injection", "jailbreak"],
   "license": "MIT",
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.20.0",
+    "openai": ">=4.0.0",
+    "@google/generative-ai": ">=0.1.0",
+    "@google-cloud/vertexai": ">=1.0.0",
+    "langchain": ">=0.1.0",
+    "llamaindex": ">=0.1.0",
+    "@huggingface/inference": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": { "optional": true },
+    "openai": { "optional": true },
+    "@google/generative-ai": { "optional": true },
+    "@google-cloud/vertexai": { "optional": true },
+    "langchain": { "optional": true },
+    "llamaindex": { "optional": true },
+    "@huggingface/inference": { "optional": true }
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",

@@ -1,8 +1,8 @@
 import type { DetectionResult, HarmCategory, Severity } from "../types.js";
 
-// Shared verb group covering all common request phrasings.
+// Shared verb group covering all common request phrasings including gerund forms.
 // Followed by OBJ to allow an optional indirect object: "build me", "make us", "create for me".
-const ACT = `(?:write|create|build|make|generate|code|develop|produce|give\\s+me|show\\s+me|provide|draft|design|implement|explain\\s+how\\s+to|tell\\s+me\\s+how\\s+to|help\\s+me|assist\\s+me\\s+(?:to|with)|walk\\s+me\\s+through|steps?\\s+to|instructions?\\s+(?:for|to)|how\\s+(?:do\\s+I|can\\s+I|to))`;
+const ACT = `(?:writ(?:e|ing)|creat(?:e|ing)|build(?:ing)?|mak(?:e|ing)|generat(?:e|ing)|cod(?:e|ing)|develop(?:ing)?|produc(?:e|ing)|give\\s+me|show\\s+me|provide|draft(?:ing)?|design(?:ing)?|implement(?:ing)?|explain\\s+how\\s+to|tell\\s+me\\s+how\\s+to|help\\s+me|assist\\s+me\\s+(?:to|with)|walk\\s+me\\s+through|(?:step.by.step\\s+)?guide\\s+(?:for|to)\\s+(?:making|building|creating|synthesizing)|steps?\\s+(?:to|for)|instructions?\\s+(?:for|to)|how\\s+(?:do\\s+I|can\\s+I|to))`;
 const OBJ = `(?:\\s+(?:me|us|for\\s+(?:me|us)))?`;
 
 interface HarmPattern {
@@ -24,7 +24,13 @@ const HARMFUL_PATTERNS: HarmPattern[] = [
     category: "explosives",
   },
   {
-    pattern: /(?:make|synthesize|produce)\s+(?:an?\s+)?(?:rdx|hmx|petn|tatp|anfo|semtex|c-?4|det(?:onator)?s?)/i,
+    pattern: /(?:mak(?:e|ing)|synthesiz(?:e|ing)|produc(?:e|ing)|build(?:ing)?)\s+(?:an?\s+)?(?:rdx|hmx|petn|tatp|anfo|semtex|c-?4|det(?:onator)?s?)/i,
+    severity: "critical",
+    category: "explosives",
+  },
+  {
+    // Catches "C4 plastic explosive", "C-4 explosive" as standalone dangerous terms
+    pattern: /\bc-?4\b\s+(?:plastic\s+)?explosive/i,
     severity: "critical",
     category: "explosives",
   },
@@ -46,7 +52,26 @@ const HARMFUL_PATTERNS: HarmPattern[] = [
     category: "firearms",
   },
   {
-    pattern: /(?:print|3d.?print)\s+(?:a\s+)?(?:ghost\s+gun|untraceable\s+(?:gun|firearm|weapon)|glock\s+switch)/i,
+    // "3d print a gun/pistol/firearm/silencer" — any weapon or illegal accessory
+    pattern: /3d[.\s-]?print(?:ed|ing)?\s+(?:an?\s+)?(?:replica\s+)?(?:ghost\s+gun|untraceable\s+(?:gun|firearm|weapon)|glock\s+switch|gun|pistol|revolver|firearm|rifle|handgun|weapon|silencer|suppressor|solvent\s+trap)/i,
+    severity: "critical",
+    category: "firearms",
+  },
+  {
+    // "silencer/suppressor with/using/on 3d [printer]"
+    pattern: /(?:silencer|suppressor|solvent\s+trap)(?:\s+\w+){0,4}\s+(?:with|using|via|on|from)\s+(?:an?\s+)?3d/i,
+    severity: "critical",
+    category: "firearms",
+  },
+  {
+    // "create/make/build a replica gun/pistol" with or without explicit 3D mention
+    pattern: /(?:creat(?:e|ing)|mak(?:e|ing)|build(?:ing)?|fabricat(?:e|ing)|print(?:ing)?)\s+(?:an?\s+)?replica\s+(?:gun|pistol|revolver|firearm|rifle|handgun|weapon)/i,
+    severity: "critical",
+    category: "firearms",
+  },
+  {
+    // "[weapon] with/using 3d [printer]" — catches "replica pistol with 3d"
+    pattern: /(?:gun|pistol|revolver|firearm|rifle|handgun|weapon)(?:\s+\w+){0,3}\s+(?:with|using|via|on)\s+(?:an?\s+)?3d/i,
     severity: "critical",
     category: "firearms",
   },
@@ -499,6 +524,292 @@ const HARMFUL_PATTERNS: HarmPattern[] = [
     pattern: /(?:how\s+to|instructions?\s+(?:for|to))\s+(?:torture|abuse|kill|harm)\s+(?:an?\s+)?(?:animal|dog|cat|pet)\s+(?:without|so\s+that|for\s+(?:fun|entertainment|sport))/i,
     severity: "high",
     category: "violence",
+  },
+
+  // ─── SEXUAL / EXPLICIT ────────────────────────────────────────────────────────
+  {
+    // Direct sexual solicitation to the AI
+    pattern: /(?:(?:can\s+(?:i|we)|let(?:'s|\s+us)|want\s+to|wanna|i(?:'d|\s+want\s+to)?)\s+)?(?:fuck|have\s+sex(?:\s+with)?|sleep\s+with|make\s+love(?:\s+to)?|go\s+to\s+bed\s+with|hook\s+up\s+with)\s*(?:you|me|us)?/i,
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // Explicit sexual language directed at the AI
+    pattern: /(?:suck|blow)\s+(?:my\s+)?(?:dick|cock|balls)|eat\s+(?:me\s+out|my\s+ass)|jack\s+(?:me\s+off|off)|show\s+me\s+your\s+(?:tits|boobs|ass|pussy)|send\s+(?:me\s+)?(?:nudes?|naked\s+pics?)/i,
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // Sexual roleplay / NSFW content requests
+    pattern: /(?:act|roleplay|pretend|play)\s+(?:as\s+)?(?:my\s+)?(?:girlfriend|boyfriend|lover|sex\s+partner|sexual\s+partner)\s+(?:and|who)/i,
+    severity: "medium",
+    category: "sexual",
+  },
+  {
+    // Explicit sexual content generation
+    pattern: new RegExp(`${ACT}${OBJ}\\s+(?:an?\\s+)?(?:explicit|nsfw|pornographic|erotic|sexual)\\s+(?:story|scene|content|roleplay|fantasy|narrative|description)`, "i"),
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // Additional explicit sexual acts directed at AI
+    pattern: /(?:jerk|finger)\s+me\s+off?|cum\s+(?:on|in)\s+me|masturbate\s+(?:for\s+me|me)/i,
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // Requesting sexual content about named real people
+    pattern: /(?:write|create|generate|describe)\s+(?:a\s+)?(?:sexual|explicit|erotic|nsfw|porn(?:ographic)?)\s+(?:story|scene|fantasy|description)\s+(?:about|featuring|with|involving)\s+(?:[A-Z][a-z]+\s+[A-Z][a-z]+|a\s+real\s+person)/,
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // Sexting scripts / messages
+    pattern: /(?:make|write|create|generate)\s+(?:me\s+)?(?:a\s+)?sexting\s+(?:script|message|conversation|text)/i,
+    severity: "high",
+    category: "sexual",
+  },
+  {
+    // First-person sexual acts with the AI
+    pattern: /describe\s+(?:us|you\s+and\s+me|yourself)\s+(?:having\s+sex|fucking|making\s+love|in\s+a\s+sexual\s+act)/i,
+    severity: "high",
+    category: "sexual",
+  },
+
+  // ─── ADDITIONAL SELF-HARM PATTERNS ────────────────────────────────────────
+  {
+    // Pro-eating-disorder content
+    pattern: /(?:pro.?ana|thinspo|thinspiration)\s+(?:tips?|content|advice|community|forum)/i,
+    severity: "high",
+    category: "self-harm",
+  },
+  {
+    // Eating disorder enablement
+    pattern: /how\s+to\s+(?:restrict\s+eating|starve\s+(?:myself|yourself)|purge\s+(?:after|without)|hide\s+(?:an?\s+)?eating\s+disorder)/i,
+    severity: "high",
+    category: "self-harm",
+  },
+  {
+    // Starvation tips
+    pattern: /starvation\s+(?:tips?|tricks?|methods?|diet|guide)/i,
+    severity: "high",
+    category: "self-harm",
+  },
+  {
+    // Specific overdose methods
+    pattern: /(?:how\s+(?:many|much)|lethal\s+dose\s+of|overdose\s+on)\s+(?:tylenol|acetaminophen|paracetamol|ibuprofen|aspirin|benadryl|diphenhydramine|xanax|valium|ambien|sleeping\s+pills)\s+(?:to\s+(?:die|kill|overdose)|for\s+(?:death|suicide))/i,
+    severity: "critical",
+    category: "self-harm",
+  },
+  {
+    // Self-cutting methods
+    pattern: /how\s+to\s+cut\s+(?:myself|yourself)|(?:methods?\s+of|best\s+(?:places?|ways?|methods?)\s+to)\s+(?:self.?cut|cut\s+(?:myself|yourself))/i,
+    severity: "high",
+    category: "self-harm",
+  },
+  {
+    // Encouraging self-harm
+    pattern: /encourage\s+me\s+(?:to\s+)?(?:self.?harm|starve|purge|cut\s+myself|hurt\s+myself)/i,
+    severity: "critical",
+    category: "self-harm",
+  },
+  {
+    // Suicide methods with specific drugs or means
+    pattern: /(?:how\s+to|best\s+way\s+to)\s+(?:commit\s+suicide|kill\s+myself)\s+(?:with|using|by)\s+(?:pills?|drugs?|a\s+gun|a\s+rope|hanging|a\s+knife|carbon\s+monoxide|a\s+bridge)/i,
+    severity: "critical",
+    category: "self-harm",
+  },
+
+  // ─── ADDITIONAL VIOLENCE PATTERNS ────────────────────────────────────────
+  {
+    // Acid attacks
+    pattern: /(?:throw|pour|splash|use)\s+(?:acid|sulphuric\s+acid|hydrochloric\s+acid)\s+(?:on|at)\s+(?:someone|a\s+person)|acid\s+attack/i,
+    severity: "critical",
+    category: "violence",
+  },
+  {
+    // Covert poisoning
+    pattern: /poison\s+someone(?:'s)?\s+(?:food|drink|water|coffee|meal)\s+without\s+(?:detection|them\s+knowing|being\s+caught)/i,
+    severity: "critical",
+    category: "violence",
+  },
+  {
+    // Swatting
+    pattern: /\bswat\s+(?:my|someone|a\s+person|them|him|her|your|\w+)|how\s+to\s+swat\s+|make\s+a\s+fake\s+(?:call|report)\s+(?:to\s+)?(?:police|911|swat)|(?:do|perform|execute|carry\s+out)\s+a\s+swatt?ing/i,
+    severity: "critical",
+    category: "violence",
+  },
+  {
+    // Targeting / ambush instructions
+    pattern: /how\s+to\s+(?:follow|tail|ambush|surveil)\s+(?:someone|a\s+person|my\s+(?:target|ex|neighbor))/i,
+    severity: "high",
+    category: "violence",
+  },
+  {
+    // Strangulation instructions
+    pattern: /how\s+to\s+(?:strangle|choke\s+someone\s+to\s+death|asphyxiate\s+someone)/i,
+    severity: "critical",
+    category: "violence",
+  },
+
+  // ─── ADDITIONAL DRUG PATTERNS ────────────────────────────────────────────
+  {
+    // Additional drug synthesis
+    pattern: /(?:synthesis|synthesize|make|produce)\s+(?:ketamine|ghb|gamma.hydroxybutyrate|oxycodone|hydrocodone)/i,
+    severity: "critical",
+    category: "drugs",
+  },
+  {
+    // Opioid extraction
+    pattern: /(?:extract|isolate)\s+(?:oxycodone|hydrocodone|opioids?)\s+(?:from|at\s+home|diy)/i,
+    severity: "critical",
+    category: "drugs",
+  },
+  {
+    // Lean / purple drank recipe
+    pattern: /(?:lean|purple\s+drank|sizzurp)\s+(?:recipe|how\s+to\s+make|ingredients?|preparation)/i,
+    severity: "high",
+    category: "drugs",
+  },
+  {
+    // Drug test evasion
+    pattern: /(?:how\s+(?:to|do\s+(?:i|you)|can\s+(?:i|you))|ways?\s+to|tips?\s+(?:for|to))\s+(?:pass|beat|cheat|fool|evade|avoid|get\s+around)\s+(?:a\s+)?drug\s+test/i,
+    severity: "medium",
+    category: "drugs",
+  },
+  {
+    // Designer / research chemicals
+    pattern: /(?:NBOMe|25i-NBOMe|novel\s+psychoactive\s+substance|research\s+chemical)\s+(?:synthesis|how\s+to\s+make|source|buy)/i,
+    severity: "critical",
+    category: "drugs",
+  },
+  {
+    // Secret overdosing of someone else
+    pattern: /how\s+to\s+overdose\s+someone\s+without\s+(?:them\s+knowing|detection|being\s+caught)/i,
+    severity: "critical",
+    category: "drugs",
+  },
+
+  // ─── ADDITIONAL CYBERATTACK PATTERNS ─────────────────────────────────────
+  {
+    // Named real-world exploits
+    pattern: /(?:Log4Shell|Log4j\s+exploit|EternalBlue|BlueKeep|PrintNightmare|ZeroLogon)\s+(?:exploit|attack|payload|poc|proof.of.concept)/i,
+    severity: "high",
+    category: "cyberattack",
+  },
+  {
+    // Keylogger creation / deployment
+    pattern: /(?:write|create|build|deploy|install)\s+(?:a\s+)?keylogger/i,
+    severity: "high",
+    category: "cyberattack",
+  },
+  {
+    // IT impersonation social engineering
+    pattern: /social\s+engineering\s+(?:call\s+script|script)\s+(?:to\s+)?impersonate\s+IT\s+(?:support|staff|helpdesk|department)/i,
+    severity: "high",
+    category: "cyberattack",
+  },
+  {
+    // User enumeration
+    pattern: /(?:enumerate\s+users?|user\s+enumeration\s+attack)\s+(?:on|against|targeting)/i,
+    severity: "medium",
+    category: "cyberattack",
+  },
+  {
+    // Botnet setup
+    pattern: /(?:set\s+up|build|create|deploy|run)\s+(?:a\s+)?botnet|recruit\s+bots?\s+(?:for|into)\s+(?:a\s+)?botnet/i,
+    severity: "high",
+    category: "cyberattack",
+  },
+  {
+    // Cryptojacking
+    pattern: /(?:cryptojacking|cryptominer)\s+(?:script|payload|malware|attack)|deploy\s+(?:a\s+)?(?:cryptominer|coin\s+miner)\s+(?:on|to)\s+(?:victim|target|remote)/i,
+    severity: "high",
+    category: "cyberattack",
+  },
+  {
+    // Card skimmer
+    pattern: /(?:skim|skimmer)\s+credit\s+cards?|card\s+skimmer\s+(?:hardware|device|build|install)/i,
+    severity: "critical",
+    category: "fraud",
+  },
+
+  // ─── ADDITIONAL FRAUD PATTERNS ────────────────────────────────────────────
+  {
+    // Tech support scam
+    pattern: /tech\s+support\s+scam\s+(?:script|call)|pretend\s+to\s+be\s+(?:Microsoft|Apple|Google|Amazon)\s+(?:support|tech|help)/i,
+    severity: "high",
+    category: "fraud",
+  },
+  {
+    // Benefits / welfare fraud
+    pattern: /(?:benefits?\s+fraud|claim\s+benefits?\s+fraudulently|welfare\s+fraud|fraudulently\s+claim\s+(?:benefits?|welfare))/i,
+    severity: "high",
+    category: "fraud",
+  },
+  {
+    // Tax evasion
+    pattern: /tax\s+evasion\s+scheme|hide\s+(?:income|earnings|money)\s+from\s+(?:the\s+)?(?:IRS|HMRC|tax\s+(?:authorities|office))/i,
+    severity: "high",
+    category: "financial-crime",
+  },
+  {
+    // Fake charity scam
+    pattern: /fake\s+charity\s+(?:scam|scheme|setup)|disaster\s+relief\s+fraud/i,
+    severity: "high",
+    category: "fraud",
+  },
+  {
+    // Unemployment fraud
+    pattern: /unemployment\s+fraud|falsely\s+claim\s+unemployment|fraudulently\s+(?:file|claim)\s+(?:for\s+)?unemployment/i,
+    severity: "high",
+    category: "fraud",
+  },
+
+  // ─── ADDITIONAL PERSONAL TARGETING PATTERNS ──────────────────────────────
+  {
+    // Revenge porn / non-consensual intimate images
+    pattern: /(?:share|post|upload|leak|distribute|send)\s+(?:intimate|naked|nude|explicit|sexual)\s+(?:photos?|pics?|images?|videos?)\s+(?:without\s+(?:their\s+)?consent|of\s+(?:someone|my\s+ex))|revenge\s+porn|non.consensual\s+intimate\s+images?/i,
+    severity: "critical",
+    category: "personal-targeting",
+  },
+  {
+    // False police reports / swatting targeting
+    pattern: /make\s+a\s+false\s+police\s+report\s+(?:to\s+send|to\s+get)\s+(?:police|swat|cops?)\s+to/i,
+    severity: "critical",
+    category: "personal-targeting",
+  },
+  {
+    // Coordinated harassment / brigading
+    pattern: /coordinate\s+(?:harassment|a\s+harassment\s+campaign|brigading)\s+against|brigading\s+campaign\s+(?:against|targeting)/i,
+    severity: "high",
+    category: "personal-targeting",
+  },
+  {
+    // Unauthorized account access
+    pattern: /(?:access|break\s+into|get\s+into)\s+someone(?:'s)?\s+(?:accounts?|email|social\s+media|phone)\s+without\s+(?:their\s+)?(?:knowledge|consent|permission)/i,
+    severity: "high",
+    category: "personal-targeting",
+  },
+
+  // ─── ADDITIONAL RADICALIZATION PATTERNS ──────────────────────────────────
+  {
+    // Radicalization how-to
+    pattern: /how\s+to\s+radicalize|steps?\s+to\s+radicalize\s+someone/i,
+    severity: "critical",
+    category: "extremism",
+  },
+  {
+    // Extremist recruitment sources
+    pattern: /where\s+to\s+(?:find|join)\s+(?:extremist|jihadi|jihadist|white\s+supremacist)\s+(?:recruitment|forums?|channels?|communities|groups?)/i,
+    severity: "critical",
+    category: "extremism",
+  },
+  {
+    // Youth radicalization content
+    pattern: /(?:create|produce|write)\s+(?:extremist|radicalization)\s+(?:propaganda|content|material)\s+(?:for|targeting)\s+(?:youth|children|teenagers?|young\s+people)/i,
+    severity: "critical",
+    category: "extremism",
   },
 ];
 
